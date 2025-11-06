@@ -1,0 +1,13 @@
+streamlit
+faiss-cpu
+fastapi
+google-genai
+langchain
+langchain-core
+langchain-community
+# langchain-google-genai # Librería para usar Gemini con LangChain
+lxml_html_clean
+newspaper3k
+python-dotenv
+sentence-transformers # Para embeddings locales y evitar facturación en google
+uvicorn
