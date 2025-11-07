@@ -4,19 +4,49 @@ from newspaper import Article, build
 from datetime import datetime
 import streamlit as st
 from llm_client import get_gemini_client, LLM_MODEL
+import random
 
+# User-Agent list to avoid blocks, simulate real browser
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148'
+]
 # --- Lista de URLs de ejemplo (debería ser tu lista de DB en el futuro) ---
 F1_SOURCES = [
-    {"driver": "F1 news", "source": "MotorSport F1", "url": "https://es.motorsport.com/f1/news/"},
+    {"driver": "F1 news", "source": "MotorSport F1", "url": "https://es.motorsport.com/f1/news/"}
 ]
+# {"driver": "F1 News", "source": "Car and Driver F1", "url": "https://www.caranddriver.com/es/formula-1/"}
+# {"driver": "F1 news", "source": "MotorSport F1", "url": "https://es.motorsport.com/f1/news/"},
 # {"driver": "F1 news", "source": "Marca F1", "url": "https://www.marca.com/motor/formula1.html"},
-# {"driver": "Ferrari", "source": "Sitio Oficial Ferrari F1", "url": "https://www.ferrari.com/es-ES/formula1"},
-# {"driver": "Mercedes", "source": "Mercedes F1", "url": "https://www.mercedesamgf1.com/en/"}
 # ---------------------------------------------------------------------------
 F1_KEYWORDS = ['f1', 'fórmula 1', 'formula 1', 'verstappen', 'hamilton', 'alonso', 'sainz', 'wolff',
                'leclerc', 'red bull', 'mercedes', 'ferrari', 'gp', 'gran premio', 'aston martin'
                'mclaren', 'alpine', 'pit stop', 'parrilla', 'carrera', 'colapinto']
 # ---------------------------------------------------------------------------
+
+
+# Construye la fuente de newspaper con un User-Agent aleatorio
+def build_newspaper_source(url):
+    """
+    Intenta construir y descargar el índice del sitio web usando un User-Agent rotativo.
+    Esto ayuda a mitigar los bloqueos.
+    """
+    try:
+        # 1. Selecciona un User-Agent aleatorio
+        user_agent = random.choice(USER_AGENTS)
+        # 2. Construye el objeto 'source' con el User-Agent específico
+        paper = build(
+            url,
+            memoize_articles=False,
+            fetch_images=False,
+            browser_user_agent=user_agent
+        )
+        return paper
+    except Exception as e:
+        print(f"Error al construir la fuente {url}: {e}")
+        return None
 
 
 def summarize_with_gemini(text_content: str) -> str:
@@ -36,7 +66,7 @@ def summarize_with_gemini(text_content: str) -> str:
 
     ARTÍCULO COMPLETO:
     ---
-    {text_content[:5000]} # Limitamos el texto para no exceder el token limit - 8000
+    {text_content[:1000]} # Limitamos el texto para no exceder el token limit - 8000
     ---
     """
 
@@ -56,8 +86,12 @@ def scrape_and_process_article(url: str, source_data: dict, min_date: datetime) 
     Scrapea una URL, extrae el texto, lo resume y retorna los datos en el formato RAG.
     Devuelve una lista de un solo elemento (o vacía si falla/es viejo).
     """
+    if "/video/" in url:
+        return None
+
     try:
-        article = Article(url)
+        user_agent = random.choice(USER_AGENTS)
+        article = Article(url, headers={'User-Agent': user_agent})
         article.download()
         article.parse()
 
@@ -104,7 +138,7 @@ def fetch_recent_news(start_date: datetime = datetime.today()) -> list:
     Busca artículos recientes de las fuentes predefinidas y los procesa.
     """
     PAPER_ARTICLES_LIMIT = 100
-    F1_PAPER_ARTICLES_LIMIT = 5
+    F1_PAPER_ARTICLES_LIMIT = 2
     f1_papers = 0
     processed_articles = []
 
@@ -114,7 +148,10 @@ def fetch_recent_news(start_date: datetime = datetime.today()) -> list:
 
         try:
             # 1. Construir el índice (descarga la página principal y busca enlaces a artículos)
-            paper = build(source_url, memoize_articles=False, fetch_images=False)
+            paper = build_newspaper_source(source_url)
+            if paper is None:
+                st.error(f"❌ Fallo de conexión o bloqueo para {source_url}. Saltando fuente.")
+                continue
             print(source_url)
 
             st.write(f"  Artículos potenciales encontrados: {len(paper.articles)}")
@@ -136,7 +173,7 @@ def fetch_recent_news(start_date: datetime = datetime.today()) -> list:
                         break
 
         except Exception as e:
-            st.error(f"Fallo al construir el índice para {source_url}. Puede que el sitio web esté bloqueando el acceso. Error: {e}")
+            st.error(f"Fallo durante la iteración de artículos de {source_url}. Error: {e}")
 
     # Añadimos un MOCK si no se encuentra nada para asegurar el flujo de la demo
     if not processed_articles:
