@@ -4,6 +4,7 @@ import streamlit as st
 import os
 import time
 from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
 from llm_client import get_gemini_client, get_local_embedding_function, LLM_MODEL
 
 # Configuración de FAISS
@@ -76,22 +77,34 @@ def update_db_with_news(vector_store: FAISS, placeholder_news: list):
     except Exception as e:
         st.error(f"Error al añadir documentos a FAISS: {e}")
 
-# --- Función RAG Principal ---
 
-def query_rag_system(query: str, vector_store: FAISS):
+def get_rag_context(query: str, vector_store: FAISS) -> tuple[str, list[Document]]:
     """
-    Sistema RAG: Recuperación con FAISS y Generación con Gemini Client.
+    Recuperación (Retrieval): Busca en FAISS y formatea el contexto.
     """
-    if st.session_state['db_size'] == 0:
-        return "⚠️ La base de datos está vacía. Por favor, actualiza las noticias primero."
+    if st.session_state.get('db_size', 0) == 0:
+        return "", []
 
     # 1. Retrieval (Recuperación)
     with st.spinner("🔍 Buscando contexto relevante en la BD Vectorial (FAISS)..."):
+        # Asumo que get_vector_store() retorna el objeto FAISS si es necesario
         docs = vector_store.similarity_search(query, k=3)
-        
-    # Extraer el contexto de los documentos recuperados
+    # Extraer y formatear el contexto
     context = "\n---\n".join([doc.page_content for doc in docs])
-    
+    return context, docs
+
+
+def query_rag_system(query: str, vector_store: FAISS):
+    """
+    Sistema RAG COMPLETO: Recuperación con FAISS y Generación con Gemini Client.
+    (Esta función ahora se simplifica y reusa la lógica de arriba)
+    """
+    if st.session_state.get('db_size', 0) == 0:
+        return "⚠️ La BD está vacía. Por favor, actualiza las noticias primero."
+
+    # Reusa la lógica de recuperación
+    context, docs = get_rag_context(query, vector_store)
+
     # 2. Generation (Generación)
     prompt_template = f"""
     Eres un experto en Fórmula 1. Genera una respuesta concisa, profesional y en español
@@ -103,24 +116,23 @@ def query_rag_system(query: str, vector_store: FAISS):
     CONTEXTO DE NOTICIAS:
     {context}
     """
-    
+
     try:
         client = get_gemini_client()
-        
+
         with st.spinner(f"🤖 Generando respuesta con el LLM ({LLM_MODEL})..."):
             response = client.models.generate_content(
                 model=LLM_MODEL,
                 contents=[prompt_template]
             ).text
-        
+
         # Generar metadatos para referencia del usuario
         source_info = "\n\n**Fuentes utilizadas:**\n"
         for i, doc in enumerate(docs):
             meta = doc.metadata
             source_info += f"- Fragmento {i+1} de **{meta.get('driver', 'N/A')}** (Fuente: {meta.get('source', 'N/A')})\n"
-        
+
         return response + source_info
 
     except Exception as e:
         return f"Error al generar la respuesta con Gemini LLM: {e}"
-    

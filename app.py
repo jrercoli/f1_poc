@@ -29,7 +29,7 @@ st.subheader("Selecciona una funcionalidad:")
 
 # Usamos columnas para centrar y dar espacio a los botones/tarjetas
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     IMAGE_PATH = "images/f1_red_bull.jpg"
@@ -77,6 +77,18 @@ with col3:
         "pages/f1_news_scraper.py",
         label="🕸️ Web Scraping",
         icon="📰",
+        use_container_width=True
+    )
+
+with col4:
+    st.markdown("")
+    st.markdown("### 🧠 Consulta Universal")
+    st.info("Pregunta cualquier cosa. El LLM usará **RAG (Noticias)** o **Tools (Calendario)** según sea necesario.")
+
+    st.page_link(
+        "pages/f1_unified_query.py",
+        label="⚙️ Iniciar Consulta Universal",
+        icon="🧠",
         use_container_width=True
     )
 
