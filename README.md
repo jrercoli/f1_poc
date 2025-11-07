@@ -27,18 +27,18 @@ The main goal is for the **LLM to autonomously decide which resource to use** to
 
 The application is organized into several Streamlit pages (`pages/`), each focused on a specific AI functionality.
 
-### 🧠 1. Universal Query (`pages/4_consulta_eventos.py`)
+### 🧠 1. Universal Query (`pages/f1_unified_query.py`)
 
 This is the main feature. The LLM receives the user query and executes the **(RAG + Tools) orchestration logic** to decide which resource to use:
 
 * **Calendar Questions (Dates, Circuits, GPs):** The LLM executes the **Calendar API Tool** (FastAPI) to fetch structured data.
 * **News Questions (Drivers, Statements, Updates):** The LLM uses the **RAG Context** (FAISS data) to ground the answer.
 
-### 📰 2. RAG Query (News-Based) (`pages/2_consulta_rag.py`)
+### 📰 2. RAG Query (News-Based) (`pages/f1_drive_query.py`)
 
 Allows direct interaction with the RAG system. Users can query the vectorized knowledge base about previously scraped news. **Does not use API Tools.**
 
-### ⚙️ 3. Configuration & Update (`pages/3_configuracion_actualizacion.py`)
+### ⚙️ 3. Configuration & Update (`pages/f1_news_scraper.py`)
 
 Interface for managing the knowledge base:
 
@@ -53,10 +53,13 @@ To get the project running, you need to execute the API Tool and the Streamlit i
 
 ### 1. Preparation
 
-1.  **Clone Repository and Install Dependencies:**
+1.  **Clone Repository and Install Dependencies (using virtual env):**
     ```bash
     git clone [REPO_URL]
-    cd f1_news_poc
+    cd f1_poc
+    python -m venv venv
+    source venv/bin/activate  # for Linux/macOS
+    # venv\Scripts\activate   # for Windows
     pip install -r requirements.txt
     ```
 
