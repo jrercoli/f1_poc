@@ -1,4 +1,4 @@
-# app.py (Página de Inicio)
+# app.py 
 
 import streamlit as st
 
@@ -7,7 +7,6 @@ import streamlit as st
 # ptvsd.wait_for_attach()
 
 from dotenv import load_dotenv
-# Cargar la clave de la API desde el archivo .env (siempre al inicio)
 load_dotenv()
 
 st.set_page_config(
@@ -16,16 +15,16 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title("🏎️ Bienvenido a la App de F1 Generativa (Prototipo)")
+st.title("🏎️ Welcome to the Generative F1 App (Prototype)")
 st.markdown("---")
 
 st.markdown("""
-¡Tu aplicación para fanáticos de la Fórmula 1 basada en IA está lista para ser explorada! 
-Utilizamos LLMs, RAG con FAISS (local) y API Tools (próximamente) para darte información 
-actualizada y valiosa.
+Your AI-powered Formula 1 fan app is ready to be explored!
+
+We use LLMs, RAG with FAISS (local) and API Tools to give you up-to-date and valuable information.
 """)
 
-st.subheader("Selecciona una funcionalidad:")
+st.subheader("Select an option:")
 
 # Usamos columnas para centrar y dar espacio a los botones/tarjetas
 
@@ -38,11 +37,11 @@ with col1:
         caption='Red Bull F1',
         width=300
     )
-    st.markdown("### ❓ Consulta de Pilotos F1")
-    st.info("Pregunta cualquier cosa sobre los pilotos. La IA usará una base de datos vectorial con noticias actualizadas para responderte con contexto.")
+    st.markdown("### ❓ F1 driver query")
+    st.info("Ask anything about the drivers. The AI ​​will use a vector database with up-to-date news to answer you with context.")
     st.page_link(
         "pages/f1_drive_query.py",
-        label="🚀 Ir a Consultar Pilotos",
+        label="🚀 Driver query",
         icon="❓",
         use_container_width=True
     )
@@ -54,11 +53,11 @@ with col2:
         caption='F1 News',
         width=300
     )
-    st.markdown("### 📡 Actualización de Noticias")
-    st.info("Aquí puedes simular el proceso de 'scraping' para obtener nuevas noticias y generar los embeddings, manteniendo la base de datos fresca.")
+    st.markdown("### 📡 News Update")
+    st.info("Here you can simulate the 'scraping' process to obtain new news and generate the embeddings, keeping the database fresh.")
     st.page_link(
         "pages/news_update.py",
-        label="🔄 Ir a Actualizar BD",
+        label="🔄 DB update (simulated news)",
         icon="📡",
         use_container_width=True
     )
@@ -70,8 +69,8 @@ with col3:
         caption='F1 news web scrape',
         width=300
     )    
-    st.markdown("### 📰 Scrapeo Web y Resumen")
-    st.info("Obtención de noticias de la web, resumen automático con Gemini, e indexación en el RAG.")
+    st.markdown("### 📰 Web Scraping and Summary")
+    st.info("Get news from the web, automatic summarization with Gemini, and indexing in the RAG")
 
     st.page_link(
         "pages/f1_news_scraper.py",
@@ -81,13 +80,13 @@ with col3:
     )
 
 with col4:
-    st.markdown("")
-    st.markdown("### 🧠 Consulta Universal")
-    st.info("Pregunta cualquier cosa. El LLM usará **RAG (Noticias)** o **Tools (Calendario)** según sea necesario.")
+    st.markdown("Ask anything. The LLM will use **RAG (News)** or **Tools (Calendar)** as needed.")
+    st.markdown("### 🧠 Universal query")
+    st.info("")
 
     st.page_link(
         "pages/f1_unified_query.py",
-        label="⚙️ Iniciar Consulta Universal",
+        label="⚙️ Universal query",
         icon="🧠",
         use_container_width=True
     )
