@@ -5,17 +5,16 @@ import time
 from rag import get_vector_store, update_db_with_news
 from llm_client import EMBEDDING_MODEL_LOCAL
 
-# Inicialización y obtención del Vector Store
 vector_store = get_vector_store()
 
 st.set_page_config(
-    page_title="📡 Actualización de Noticias"
+    page_title="📡 News Update"
 )
-st.title("📡 Módulo de Actualización de Noticias (FAISS Local)")
-st.caption(f"DB Indexada: **{st.session_state['db_size']}** documentos (Embeddings: {EMBEDDING_MODEL_LOCAL}).")
+st.title("📡 News update (local FAISS DB)")
+st.caption(f"Indexed DB: **{st.session_state['db_size']}** documents (Embeddings: {EMBEDDING_MODEL_LOCAL}).")
 st.markdown("---")
 
-# Datos de prueba (MOCK_NEWS) - Duplicados aquí por simplicidad de módulo
+# dummy data (MOCK_NEWS)
 MOCK_NEWS = [
     {"driver": "Max Verstappen", "source": "f1.com", "content": "Verstappen consiguió su 18ª victoria de la temporada en el GP de Brasil, demostrando una superioridad sin precedentes. El equipo Red Bull confirmó que el coche del 2026 tendrá un enfoque aerodinámico radicalmente nuevo."},
     {"driver": "Fernando Alonso", "source": "motorlat.com", "content": "Alonso expresó su frustración tras un fallo en el pit-stop durante la última carrera. Sin embargo, el equipo Aston Martin está preparando grandes mejoras para las carreras restantes, enfocadas en la tracción a baja velocidad."},
@@ -26,31 +25,31 @@ MOCK_NEWS = [
 if 'mock_data_indexed' not in st.session_state:
     st.session_state['mock_data_indexed'] = False
 
-st.header("1. Proceso de Indexación")
+st.header("1. Index process")
 col1, col2 = st.columns([1, 2])
 
 with col1:
-    st.info("La generación de embeddings es **100% gratuita** y local.")
+    st.info("Embeddings generation **100% free** and local.")
 
     if st.session_state['mock_data_indexed']:
-        st.warning(f"Los datos de prueba (MOCK NEWS) ya fueron cargados en esta sesión.")
-        if st.button("🔄 Actualizar BD con Noticias de Prueba", disabled=True):
+        st.warning(f"The test data (MOCK NEWS) has already been loaded in this session.")
+        if st.button("🔄 Update database with test news", disabled=True):
             pass 
     else:
-        if st.button("🔄 Actualizar BD con Noticias de Prueba"):
+        if st.button("🔄 Update database with test news"):
             update_db_with_news(vector_store, MOCK_NEWS)
             st.session_state['last_update'] = time.ctime()
             st.session_state['mock_data_indexed'] = True
 
 with col2:
     if 'last_update' in st.session_state:
-        st.metric("Última Actualización (Sesión)", st.session_state['last_update'])
+        st.metric("Last update", st.session_state['last_update'])
     else:
         if st.session_state['db_size'] > 0:
-            st.metric("Estado Inicial", f"Cargado desde disco ({st.session_state['db_size']} docs)")
+            st.metric("Initial state", f"Cargado desde disco ({st.session_state['db_size']} docs)")
         else:
-            st.metric("Estado Inicial", "BD Vacía")
+            st.metric("Initial state", "empty DB")
 
-    st.markdown("**Contenido de Noticias de Prueba:**")
+    st.markdown("**Test News Content:**")
     for item in MOCK_NEWS:
-        st.code(f"Piloto: {item['driver']} | Snippet: {item['content'][:50]}...", language="")
+        st.code(f"Driver: {item['driver']} | Snippet: {item['content'][:50]}...", language="")

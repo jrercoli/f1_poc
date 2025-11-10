@@ -5,36 +5,35 @@ import streamlit as st
 from llm_client import unified_query_gemini, CALENDAR_API_URL
 
 st.set_page_config(
-    page_title="🤖 Consulta Universal (RAG + Tools)"
+    page_title="🤖 Universal Query (RAG + Tools)"
 )
 
-st.title("🤖 Consulta Universal: RAG + Tools F1")
-st.caption("Introduce cualquier pregunta sobre el calendario o noticias de pilotos. El LLM decidirá qué recurso utilizar.")
+st.title("🤖 F1 Universal Query (RAG + Tools)")
+st.caption("Submit any questions about the schedule or driver news. The LLM will decide which resource to use.")
 st.markdown("---")
 
-st.header("Pregunta a Gemini:")
+st.header("Ask to Gemini:")
 
-# --- Chequeo de Estado (Mejora la UX) ---
+# --- API run status check ---
 api_is_running = False
 try:
     requests.get(CALENDAR_API_URL, timeout=1)
     api_is_running = True
-    st.success("API Tool de Calendario **ACTIVA**.")
+    st.success("Calendar API Tool **ACTIVE**.")
 except requests.exceptions.RequestException:
-    st.warning("❌ La API Tool de Calendario NO está ejecutandose. Las consultas sobre fechas/GPs fallarán.")
-    st.caption("Ejecuta **`python api_tool.py`** en una terminal separada.")
+    st.warning("❌ The Calendar API Tool is not running. Date/GP queries will fail.")
+    st.caption("Run **`python api_tool.py`** in a separate terminal.")
 # ------------------------------------------
 user_query = st.text_input(
-    "Ingresa tu pregunta:",
-    placeholder="¿Qué GPs hay en junio? o ¿Qué ha dicho Leclerc sobre el coche?"
+    "Enter your question:",
+    placeholder="What GPs are on in June? Or what has Leclerc said about the car?"
 )
 
-if st.button("🚀 Consultar", type="primary", use_container_width=True) and user_query:
-    st.subheader("Resultado de la Consulta:")
-    with st.spinner("Pensando... Gemini está orquestando el RAG y las Tools..."):
-        # Llama a la nueva función unificada
+if st.button("🚀 Query", type="primary", use_container_width=True) and user_query:
+    st.subheader("Query result:")
+    with st.spinner("Thinking... Gemini is orchestrating RAG and Tools..."):
         gemini_answer = unified_query_gemini(user_query)
-    st.markdown("## Respuesta Final del LLM")
+    st.markdown("## Final LLM response")
     st.markdown(gemini_answer)
 
 st.markdown("---")

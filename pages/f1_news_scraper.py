@@ -6,42 +6,39 @@ from scraper import fetch_recent_news
 from rag import get_vector_store, update_db_with_news
 
 st.set_page_config(
-    page_title="📡 Scrapeo y Resumen de Noticias"
+    page_title="📡 News Scraping and Summary"
 )
 
-st.title("📡 Scrapeo y Resumen de Noticias F1 (Beta)")
-st.caption("Obtención de datos reales (simulada) de sitios web, resumen con Gemini, e indexación en FAISS.")
+st.title("📡 F1 News Scraping and Summary")
+st.caption("Obtaining real (simulated) data from websites, summarizing with Gemini, and indexing in FAISS.")
 st.markdown("---")
 
-st.header("1. Configuración de Scrapeo")
+st.header("1. Scrape setup")
 
-# --- Control de Fecha ---
 default_date = datetime.today() - timedelta(days=7) # Por defecto, la última semana
 start_date = st.date_input(
-    "Fecha Mínima de Publicación",
+    "Minimum Publication Date",
     value=default_date,
-    help="Solo se indexarán artículos publicados a partir de esta fecha."
+    help="Only articles published from this date onwards will be indexed."
 )
 start_datetime = datetime(start_date.year, start_date.month, start_date.day)
 
-# --- Botón de Ejecución ---
-if st.button("🚀 Iniciar Web Scraping y Resumen (Usando Gemini)",
+if st.button("🚀 Start Web Scraping and Summary",
              type="primary", use_container_width=True):
 
     # 1. Obtener la base de datos
     vector_store = get_vector_store()
 
-    st.subheader("2. Proceso en Curso...")
+    st.subheader("2. Process in progress...")
 
     # 2. Ejecutar el scraping
-    with st.status("Iniciando proceso de Scrapeo y Resumen...", expanded=True) as status:
-        st.write(f"Buscando noticias desde: **{start_date.strftime('%Y-%m-%d')}**")
+    with st.status("Starting the scraping and summarization process...", expanded=True) as status:
+        st.write(f"Searching for news from **{start_date.strftime('%Y-%m-%d')}**")
 
         try:
-            # fetch_recent_news devuelve una tupla: (lista_de_articulos, lista_de_mensajes_de_estado)
+            # fetch_recent_news returns tuple (articles, status_messages)
             new_data, messages = fetch_recent_news(start_datetime)
-
-            # 2.1 Mostrar mensajes de estado, éxito, advertencia y debug
+            
             for msg_type, content in messages:
                 if msg_type == 'info':
                     st.info(content)
@@ -52,27 +49,24 @@ if st.button("🚀 Iniciar Web Scraping y Resumen (Usando Gemini)",
                 elif msg_type == 'error':
                     st.error(content)
                 elif msg_type == 'code':
-                    st.code(content, language="html") # Usado para mostrar HTML de debug
+                    st.code(content, language="html")  # To show debug HTML code
 
             if new_data:
-                st.success(f"🎉 Se encontraron y procesaron {len(new_data)} artículos.")
+                st.success(f"🎉 They were found and processed {len(new_data)} articles.")
 
-                # 3. Indexación en FAISS (Llamada al módulo rag.py)
-                status.update(label="Indexando nuevos resúmenes en FAISS...", state="running", expanded=True)
-
-                # Aquí llamamos directamente a la lógica de indexación de rag.py
+                # FAISS update and index
+                status.update(label="Indexing new abstracts in FAISS...", state="running", expanded=True)                
                 update_db_with_news(vector_store, new_data)
 
-                # 4. Mostrar Resultados
-                st.subheader("3. Resúmenes Indexados:")
+                st.subheader("3. Indexed Abstracts:")
                 for item in new_data:
                     st.code(f"[{item['driver']} | {item['source']}]: {item['content']}", language="markdown")
 
-                status.update(label="Proceso de Scrapeo e Indexación completo.", state="complete", expanded=False)
+                status.update(label="Complete Scraping and Indexing Process.", state="complete", expanded=False)
             else:
-                st.warning("No se encontraron nuevos artículos o el scrapeo fue bloqueado. Intenta cambiar la fecha o las fuentes.")
-                status.update(label="Proceso finalizado sin resultados.", state="complete", expanded=False)
+                st.warning("No new articles were found, or scraping was blocked. Try changing the date or fonts.")
+                status.update(label="Process completed without results.", state="complete", expanded=False)
 
         except Exception as e:
-            st.error(f"Fallo crítico en el proceso de scraping/LLM: {e}")
-            status.update(label="Proceso Fallido.", state="error")
+            st.error(f"Critical failure in the scraping/LLM process: {e}")
+            status.update(label="Process Failed.", state="error")
