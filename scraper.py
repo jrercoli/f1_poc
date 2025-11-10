@@ -2,7 +2,6 @@
 
 from newspaper import Article, build
 from datetime import datetime
-import streamlit as st
 from llm_client import get_gemini_client, LLM_MODEL
 import random
 from bs4 import BeautifulSoup
@@ -16,7 +15,7 @@ from news_source_config import (
 )
 
 
-def extract_date_from_html(article_html: str, config: dict) -> datetime | None:
+def extract_date_from_html(article_html: str, config: dict, messages: list) -> datetime | None:
     """
     Busca el metadato de fecha usando el selector y formato especificado en la config.
     Retorna un objeto datetime 'aware' (con timezone) o None si falla.
@@ -31,7 +30,7 @@ def extract_date_from_html(article_html: str, config: dict) -> datetime | None:
     date_tag = soup.select_one(config["date_selector"])
     if date_tag is None and config["date_selector"].startswith('time.'):
         class_name = config["date_selector"].split('.')[-1]
-        date_tag = soup.find('time', class_=class_name) 
+        date_tag = soup.find('time', class_=class_name)
 
     if date_tag:
         date_str = date_tag.get(config["date_attribute"])
@@ -39,10 +38,10 @@ def extract_date_from_html(article_html: str, config: dict) -> datetime | None:
 
     # Si no se encontró el tag o el atributo, activamos el debug de fallo
     if date_tag is None or date_str is None:
-        st.warning(f"🚨 DEBUG FALLO (CSS): No se encontró el tag/atributo de fecha para '{config['source']}'.")
+        messages.append(('info', f"🚨 DEBUG FALLO (CSS): No se encontró el tag/atributo de fecha para '{config['source']}'."))
         body_tag = soup.find('body')
         html_excerpt = str(body_tag)[:1000] if body_tag else article_html[:1000]
-        st.code(html_excerpt, language="html")
+        messages.append(('code', html_excerpt))
         return None
 
     # Si se encontró con selector, procedemos a parsear con formato
@@ -110,7 +109,7 @@ def summarize_with_gemini(text_content: str) -> str:
         return f"Resumen fallido por error del LLM: {e}"
 
 
-def scrape_and_process_article(url: str, source_data: dict, min_date: datetime) -> dict | None:
+def scrape_and_process_article(url: str, source_data: dict, min_date: datetime, messages: list) -> dict | None:
     """
     Scrapea una URL, extrae el texto, lo resume y retorna los datos en el formato RAG.
     Devuelve una lista de un solo elemento (o vacía si falla/es viejo).
@@ -129,8 +128,8 @@ def scrape_and_process_article(url: str, source_data: dict, min_date: datetime) 
             pub_date = None
         else:
             # Si no está bloqueado, intentamos la extracción customizada (CSS o JSON-LD)
-            pub_date = extract_date_from_html(article.html, source_data)
-    
+            pub_date = extract_date_from_html(article.html, source_data, messages)
+
         article.parse()
 
         # 1. Validación de Contenido y Fecha
@@ -138,7 +137,7 @@ def scrape_and_process_article(url: str, source_data: dict, min_date: datetime) 
             return None
         #
         final_pub_date = pub_date if pub_date else article.publish_date
-        print(f'final pub_date:{final_pub_date}')
+
         # FILTRO DE FECHA: min_date debe ser un objeto 'aware' (ya lo aseguramos en fetch_recent_news)
         if final_pub_date:
             # Aseguramos que min_date también sea 'aware' si el usuario lo pasa sin TZ
@@ -146,20 +145,18 @@ def scrape_and_process_article(url: str, source_data: dict, min_date: datetime) 
                 min_date = UTC.localize(min_date)
             # Compara si la fecha de publicación es anterior a la fecha mínima
             if final_pub_date < min_date:
-                st.info(f"  -> Descartando artículo por antigüedad: '{source_data['source']}' - {url} (Fecha: {pub_date.strftime('%Y-%m-%d')})")
+                messages.append(('info', f"  -> Descartando artículo por antigüedad: '{source_data['source']}' - {url} (Fecha: {final_pub_date.strftime('%Y-%m-%d')})"))
                 return None
         else:
             if source_data.get('is_blocked'):
-                st.info(f"Skipping date filter for blocked source: {source_data['source']}.")
+                messages.append(('info', f"Skipping date filter for blocked source: {source_data['source']}."))
             else:
-                st.warning(f"No se pudo extraer la fecha para {url} de {source_data['source']}. Se indexará sin filtro de antigüedad.")
+                messages.append(('warning', f"No se pudo extraer la fecha para {url} de {source_data['source']}"))
 
-        # 2. Resumen con Gemini LLM
+        # 2. Resumen con LLM
         summary = summarize_with_gemini(article.text)
 
         # 3. Formato RAG (driver-source-content)
-        # Intentamos adivinar el piloto basándonos en la fuente (esto se mejoraría en un sistema real)
-        # driver_guess = next((src["driver"] for src in F1_SOURCES if src["url"] == url), "Unknown")
         return {
             "driver": source_data.get('driver', 'Unknown'),
             "source": source_data.get('source', 'Web Scraping'),
@@ -167,7 +164,7 @@ def scrape_and_process_article(url: str, source_data: dict, min_date: datetime) 
         }
 
     except Exception as e:
-        st.warning(f"Error al procesar la URL {url}: {e}")
+        messages.append(('error', f"Error al procesar la URL {url}: {e}"))
         return None
 
 
@@ -184,7 +181,7 @@ def is_f1_relevant(article_title: str, article_url: str) -> bool:
     return False
 
 
-def fetch_recent_news(start_date: datetime = datetime.today()) -> list:
+def fetch_recent_news(start_date: datetime = datetime.today()) -> tuple[list, list]:
     """
     Busca artículos recientes de las fuentes predefinidas y los procesa.
     """
@@ -192,23 +189,24 @@ def fetch_recent_news(start_date: datetime = datetime.today()) -> list:
     F1_PAPER_ARTICLES_LIMIT = 2
     f1_papers = 0
     processed_articles = []
+    messages = []
+
     # Aseguramos que la fecha de inicio sea 'aware' (con TZ) para la comparación
     if start_date.tzinfo is None or start_date.tzinfo.utcoffset(start_date) is None:
         start_date = UTC.localize(start_date)
 
     for source_data in F1_SOURCES:
         source_url = source_data['url']
-        st.info(f"🕸️ Buscando artículos en el índice: **{source_data['source']}**")
+        messages.append(('info', f"🕸️ Buscando artículos en el índice: **{source_data['source']}**"))
 
         try:
             # 1. Construir el índice (descarga la página principal y busca enlaces a artículos)
             paper = build_newspaper_source(source_url)
             if paper is None:
-                st.error(f"❌ Fallo de conexión o bloqueo para {source_url}. Saltando fuente.")
+                messages.append(('error', f"❌ Fallo de conexión o bloqueo para {source_url}. Saltando fuente."))
                 continue
-            print(source_url)
 
-            st.write(f"  Artículos potenciales encontrados: {len(paper.articles)}")
+            messages.append(('info', f"  Artículos potenciales encontrados: {len(paper.articles)}"))
 
             # 2. Iterar sobre los artículos encontrados
             # Limitamos a los primeros X para evitar sobrecarga y llamadas costosas/lentas
@@ -217,21 +215,22 @@ def fetch_recent_news(start_date: datetime = datetime.today()) -> list:
                     continue
 
                 # 3. Procesar, resumir e indexar si es relevante
-                result = scrape_and_process_article(article.url, source_data, start_date)
+                # Pasamos la lista de mensajes al scraper para centralizar los reportes
+                result = scrape_and_process_article(article.url, source_data, start_date, messages)
                 if result:
                     processed_articles.append(result)
-                    st.success(f"  ✅ Resumen de artículo indexado: {article.title[:50]}...")
                     # chequea limite de articulos F1 a almacenar
                     f1_papers += 1
                     if f1_papers >= F1_PAPER_ARTICLES_LIMIT:
+                        messages.append(('info', f"Límite de {F1_PAPER_ARTICLES_LIMIT} artículos F1 alcanzado. Deteniendo el scrapeo."))
                         break
 
         except Exception as e:
-            st.error(f"Fallo durante la iteración de artículos de {source_url}. Error: {e}")
+            messages.append(('error', f"Fallo durante la iteración de artículos de {source_url}. Error: {e}"))
 
     # Añadimos un MOCK si no se encuentra nada para asegurar el flujo de la demo
     if not processed_articles:
-        st.warning("⚠️ No se encontraron artículos reales. Añadiendo un artículo MOCK para la demostración.")
+        messages.append(('warning', "⚠️ No se encontraron artículos reales. Añadiendo un artículo MOCK para la demostración."))
         summary = """La F1 planea un cambio radical en la aerodinámica para 2026, 
         buscando coches más ligeros y con menor resistencia, enfocándose en la sostenibilidad y carreras más cerradas. 
         Este cambio promete reordenar las fuerzas entre los equipos.
@@ -242,4 +241,4 @@ def fetch_recent_news(start_date: datetime = datetime.today()) -> list:
             "content": summary
         })
 
-    return processed_articles
+    return processed_articles, messages

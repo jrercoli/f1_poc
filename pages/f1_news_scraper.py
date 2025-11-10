@@ -38,8 +38,21 @@ if st.button("🚀 Iniciar Web Scraping y Resumen (Usando Gemini)",
         st.write(f"Buscando noticias desde: **{start_date.strftime('%Y-%m-%d')}**")
 
         try:
-            # fetch_recent_news tiene lógica de MOCK/seguridad para evitar bloqueos de IP            
-            new_data = fetch_recent_news(start_datetime)
+            # fetch_recent_news devuelve una tupla: (lista_de_articulos, lista_de_mensajes_de_estado)
+            new_data, messages = fetch_recent_news(start_datetime)
+
+            # 2.1 Mostrar mensajes de estado, éxito, advertencia y debug
+            for msg_type, content in messages:
+                if msg_type == 'info':
+                    st.info(content)
+                elif msg_type == 'success':
+                    st.success(content)
+                elif msg_type == 'warning':
+                    st.warning(content)
+                elif msg_type == 'error':
+                    st.error(content)
+                elif msg_type == 'code':
+                    st.code(content, language="html") # Usado para mostrar HTML de debug
 
             if new_data:
                 st.success(f"🎉 Se encontraron y procesaron {len(new_data)} artículos.")
