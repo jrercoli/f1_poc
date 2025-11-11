@@ -26,10 +26,7 @@ We use LLMs, RAG with FAISS (local) and API Tools to give you up-to-date and val
 
 st.subheader("Select an option:")
 
-# Usamos columnas para centrar y dar espacio a los botones/tarjetas
-
 col1, col2, col3, col4 = st.columns(4)
-
 with col1:
     IMAGE_PATH = "images/f1_red_bull.jpg"
     st.image(
@@ -80,10 +77,15 @@ with col3:
     )
 
 with col4:
-    st.markdown("Ask anything. The LLM will use **RAG (News)** or **Tools (Calendar)** as needed.")
+    IMAGE_PATH = "images/f1_grid_start.jpg"
+    st.image(
+        IMAGE_PATH,
+        caption='F1 grid start',
+        width=300
+    )
     st.markdown("### 🧠 Universal query")
-    st.info("")
-
+    st.info("Ask anything. The LLM will use **RAG (News)** or **Tools (Calendar)** as needed.")
+    
     st.page_link(
         "pages/f1_unified_query.py",
         label="⚙️ Universal query",

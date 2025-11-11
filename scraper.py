@@ -17,9 +17,9 @@ from news_source_config import (
 
 def extract_date_from_html(article_html: str, config: dict, messages: list) -> datetime | None:
     """
-    Busca el metadato de fecha usando el selector y formato especificado en la config.
-    Retorna un objeto datetime 'aware' (con timezone) o None si falla.
-    """    
+    Searches for date metadata using the selector and format specified in the configuration.
+    Returns a datetime 'aware' object (with timezone) or None if it fails.
+    """
     if not article_html:
         return None
 
@@ -36,15 +36,15 @@ def extract_date_from_html(article_html: str, config: dict, messages: list) -> d
         date_str = date_tag.get(config["date_attribute"])
         date_format = config["date_format"]
 
-    # Si no se encontró el tag o el atributo, activamos el debug de fallo
+    # If the tag or attribute was not found, we activate failure debugging.
     if date_tag is None or date_str is None:
-        messages.append(('info', f"🚨 DEBUG FALLO (CSS): No se encontró el tag/atributo de fecha para '{config['source']}'."))
+        messages.append(('info', f"🚨 DEBUG FAILURE (CSS): Date tag/attribute not found for'{config['source']}'."))
         body_tag = soup.find('body')
         html_excerpt = str(body_tag)[:1000] if body_tag else article_html[:1000]
         messages.append(('code', html_excerpt))
         return None
 
-    # Si se encontró con selector, procedemos a parsear con formato
+    # If a selector was encountered, we proceed to parse with format
     try:
         dt_object = datetime.strptime(date_str, date_format)
         if dt_object.tzinfo is None or dt_object.tzinfo.utcoffset(dt_object) is None:
@@ -55,16 +55,15 @@ def extract_date_from_html(article_html: str, config: dict, messages: list) -> d
         return None
 
 
-# Construye la fuente de newspaper con un User-Agent aleatorio
+# Build the newspaper font with a random User-Agent
 def build_newspaper_source(url):
     """
-    Intenta construir y descargar el índice del sitio web usando un User-Agent rotativo.
-    Esto ayuda a mitigar los bloqueos.
+    Try building and downloading the website index using a rotating user agent.
+    This helps mitigate crashes.
     """
-    try:
-        # 1. Selecciona un User-Agent aleatorio
+    try:        
         user_agent = random.choice(USER_AGENTS)
-        # 2. Construye el objeto 'source' con el User-Agent específico
+        
         paper = build(
             url,
             memoize_articles=False,
@@ -73,28 +72,28 @@ def build_newspaper_source(url):
         )
         return paper
     except Exception as e:
-        print(f"Error al construir la fuente {url}: {e}")
+        print(f" Error building the source{url}: {e}")
         return None
 
 
 def summarize_with_gemini(text_content: str) -> str:
     """
-    Usa el cliente de Gemini para resumir el texto con las restricciones requeridas.
+    Use the Gemini client to summarize the text with the required restrictions.
     """
     if not text_content:
-        return "Resumen fallido: Contenido vacío."
-
-    # Prompt estricto para forzar el formato
+        return "Summary failed: Empty content."
+    
     prompt = f"""
-    Eres un experto en resumen de noticias de Fórmula 1. Tu tarea es resumir el siguiente artículo
-    siguiendo estas reglas estrictas:
-    1. El resumen debe tener un **máximo de 50 palabras**.
-    2. El resumen debe estar estructurado en **no más de 2 párrafos**.
-    3. Usa un tono informativo y en español.
+    You are an expert in summarizing Formula 1 news. Your task is to summarize the following article
+    following these strict rules:
 
-    ARTÍCULO COMPLETO:
+    1. The summary must have a **maximum of 50 words**.
+    2. The summary must be structured in **no more than 2 paragraphs**.
+    3. Use an informative tone and write in Spanish.
+
+    FULL ARTICLE:
     ---
-    {text_content[:1000]} # Limitamos el texto para no exceder el token limit - 8000
+    {text_content[:1000]}
     ---
     """
 
@@ -106,57 +105,51 @@ def summarize_with_gemini(text_content: str) -> str:
         ).text
         return response
     except Exception as e:
-        return f"Resumen fallido por error del LLM: {e}"
+        return f"Summary failed due to LLM error: {e}"
 
 
 def scrape_and_process_article(url: str, source_data: dict, min_date: datetime, messages: list) -> dict | None:
     """
-    Scrapea una URL, extrae el texto, lo resume y retorna los datos en el formato RAG.
-    Devuelve una lista de un solo elemento (o vacía si falla/es viejo).
-    """
-    if "/video/" in url:
-        return None
-
+    Scrapes a URL, extracts the text, summarizes it, and returns the data in RAG format.
+    Returns a single-item list (or empty if it fails/is old).
+    """    
     try:
         user_agent = random.choice(USER_AGENTS)
         article = Article(url, headers={'User-Agent': user_agent})
         article.download()
 
-        # obtener pub_date
+        # get pub_date
         if source_data.get('is_blocked'):
-            # Si está bloqueado (como MotorSport F1), confiamos en el parser interno de newspaper
+            # If it's locked, we rely on newspaper's internal parser
             pub_date = None
-        else:
-            # Si no está bloqueado, intentamos la extracción customizada (CSS o JSON-LD)
+        else:            
             pub_date = extract_date_from_html(article.html, source_data, messages)
 
         article.parse()
 
-        # 1. Validación de Contenido y Fecha
+        # Content and Date Validation
         if not article.text or len(article.text) <= 50:
             return None
         #
         final_pub_date = pub_date if pub_date else article.publish_date
 
-        # FILTRO DE FECHA: min_date debe ser un objeto 'aware' (ya lo aseguramos en fetch_recent_news)
+        # DATE FILTER: min_date must be an 'aware' object (we already ensured this in fetch_recent_news)
         if final_pub_date:
-            # Aseguramos que min_date también sea 'aware' si el usuario lo pasa sin TZ
+            # We ensure that min_date is also 'aware' if the user passes it without TZ
             if min_date.tzinfo is None or min_date.tzinfo.utcoffset(min_date) is None:
                 min_date = UTC.localize(min_date)
-            # Compara si la fecha de publicación es anterior a la fecha mínima
+
             if final_pub_date < min_date:
-                messages.append(('info', f"  -> Descartando artículo por antigüedad: '{source_data['source']}' - {url} (Fecha: {final_pub_date.strftime('%Y-%m-%d')})"))
+                messages.append(('info', f"Discarding article due to age -> : '{source_data['source']}' - {url} (Date: {final_pub_date.strftime('%Y-%m-%d')})"))
                 return None
         else:
             if source_data.get('is_blocked'):
                 messages.append(('info', f"Skipping date filter for blocked source: {source_data['source']}."))
             else:
-                messages.append(('warning', f"No se pudo extraer la fecha para {url} de {source_data['source']}"))
-
-        # 2. Resumen con LLM
+                messages.append(('warning', f" The date could not be extracted for {url} of {source_data['source']}"))
+        
         summary = summarize_with_gemini(article.text)
-
-        # 3. Formato RAG (driver-source-content)
+        
         return {
             "driver": source_data.get('driver', 'Unknown'),
             "source": source_data.get('source', 'Web Scraping'),
@@ -164,17 +157,17 @@ def scrape_and_process_article(url: str, source_data: dict, min_date: datetime, 
         }
 
     except Exception as e:
-        messages.append(('error', f"Error al procesar la URL {url}: {e}"))
+        messages.append(('error', f"Error processing URL {url}: {e}"))
         return None
 
 
 def is_f1_relevant(article_title: str, article_url: str) -> bool:
     """
-    Verifica si el título o la URL contienen palabras clave de F1.
+    Check if the title or URL contains F1 keywords.
     """
     title_lower = article_title.lower() if article_title else ""
     url_lower = article_url.lower() if article_url else ""
-    # Si al menos una palabra clave está presente, se considera relevante
+    
     for keyword in F1_KEYWORDS:
         if keyword in title_lower or keyword in url_lower:
             return True
@@ -183,7 +176,7 @@ def is_f1_relevant(article_title: str, article_url: str) -> bool:
 
 def fetch_recent_news(start_date: datetime = datetime.today()) -> tuple[list, list]:
     """
-    Busca artículos recientes de las fuentes predefinidas y los procesa.
+    It searches for recent articles from predefined sources and processes them.
     """
     PAPER_ARTICLES_LIMIT = 100
     F1_PAPER_ARTICLES_LIMIT = 2
@@ -191,52 +184,51 @@ def fetch_recent_news(start_date: datetime = datetime.today()) -> tuple[list, li
     processed_articles = []
     messages = []
 
-    # Aseguramos que la fecha de inicio sea 'aware' (con TZ) para la comparación
+    # We ensure that the start date is 'aware' (with TZ) for comparison
     if start_date.tzinfo is None or start_date.tzinfo.utcoffset(start_date) is None:
         start_date = UTC.localize(start_date)
 
     for source_data in F1_SOURCES:
         source_url = source_data['url']
-        messages.append(('info', f"🕸️ Buscando artículos en el índice: **{source_data['source']}**"))
+        messages.append(('info', f"🕸️ : **{source_data['source']}**"))
 
         try:
-            # 1. Construir el índice (descarga la página principal y busca enlaces a artículos)
+            # Build the index (download the main page and look for links to articles)
             paper = build_newspaper_source(source_url)
             if paper is None:
-                messages.append(('error', f"❌ Fallo de conexión o bloqueo para {source_url}. Saltando fuente."))
+                messages.append(('error', f"❌ Connection failure or lock for {source_url}. Skipping source."))
                 continue
 
-            messages.append(('info', f"  Artículos potenciales encontrados: {len(paper.articles)}"))
-
-            # 2. Iterar sobre los artículos encontrados
-            # Limitamos a los primeros X para evitar sobrecarga y llamadas costosas/lentas
+            messages.append(('info', f"Potential articles found : {len(paper.articles)}"))
+            
+            # We limit it to the first X articles to avoid overload and costly/slow calls
             for article in paper.articles[:PAPER_ARTICLES_LIMIT]:
                 if not is_f1_relevant(article.title, article.url):
                     continue
 
-                # 3. Procesar, resumir e indexar si es relevante
-                # Pasamos la lista de mensajes al scraper para centralizar los reportes
+                # Process, summarize, and index if relevant.
+                # We pass the message list to the scraper to centralize the reports.
                 result = scrape_and_process_article(article.url, source_data, start_date, messages)
                 if result:
                     processed_articles.append(result)
-                    # chequea limite de articulos F1 a almacenar
+                    
                     f1_papers += 1
                     if f1_papers >= F1_PAPER_ARTICLES_LIMIT:
-                        messages.append(('info', f"Límite de {F1_PAPER_ARTICLES_LIMIT} artículos F1 alcanzado. Deteniendo el scrapeo."))
+                        messages.append(('info', f"Límit of {F1_PAPER_ARTICLES_LIMIT} articles reached."))
                         break
 
         except Exception as e:
-            messages.append(('error', f"Fallo durante la iteración de artículos de {source_url}. Error: {e}"))
+            messages.append(('error', f"Failure during article iteration {source_url}. Error: {e}"))
 
-    # Añadimos un MOCK si no se encuentra nada para asegurar el flujo de la demo
+    # We add a MOCK if nothing is found to ensure the demo flows smoothly
     if not processed_articles:
-        messages.append(('warning', "⚠️ No se encontraron artículos reales. Añadiendo un artículo MOCK para la demostración."))
-        summary = """La F1 planea un cambio radical en la aerodinámica para 2026, 
-        buscando coches más ligeros y con menor resistencia, enfocándose en la sostenibilidad y carreras más cerradas. 
-        Este cambio promete reordenar las fuerzas entre los equipos.
+        messages.append(('warning', "⚠️ No real items were found. Adding a mock item for demonstration purposes."))
+        summary = """Formula 1 is planning a radical change in aerodynamics for 2026,
+        seeking lighter cars with less drag, focusing on sustainability and closer racing.
+        This change promises to reshape the balance of power between the teams.
         """
         processed_articles.append({
-            "driver": "Reglas 2026",
+            "driver": "Rules for 2026",
             "source": "F1 Mock Data",
             "content": summary
         })

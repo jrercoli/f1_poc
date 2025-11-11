@@ -7,7 +7,6 @@ from datetime import datetime
 DB_NAME = "f1_data.db"
 TABLE_NAME = "calendario_2026"
 
-# Datos de la Sección 1 (Se mantienen, pero se repiten aquí por claridad)
 CALENDAR_DATA = [
   {"desde": "06/03/2026", "hasta": "08/03/2026", "GP": "Australia", "circuito": "Albert Park"},
   {"desde": "13/03/2026", "hasta": "15/03/2026", "GP": "China", "circuito": "Internacional de Shanghái"},
@@ -36,31 +35,27 @@ CALENDAR_DATA = [
 ]
 
 
-# --- Función Auxiliar para formatear resultados ---
 def _format_results(cursor):
-    """Formatea los resultados de la consulta como lista de diccionarios."""
+    """Format the query results as a list of dictionaries."""
     columns = [col[0] for col in cursor.description]
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
-# --- Función para obtener el número de mes a partir del nombre ---
 def _get_month_number(month_name: str) -> str | None:
-    """Traduce el nombre del mes (en español) a su número de 2 dígitos."""
+    """Translate the name of the month to its 2-digit number."""
     month_map = {
-        "enero": "01", "febrero": "02", "marzo": "03", "abril": "04", 
-        "mayo": "05", "junio": "06", "julio": "07", "agosto": "08", 
-        "septiembre": "09", "octubre": "10", "noviembre": "11", "diciembre": "12"
+        "january": "01", "february": "02", "march": "03", "april": "04", 
+        "may": "05", "june": "06", "july": "07", "august": "08", 
+        "september": "09", "october": "10", "november": "11", "december": "12"
     }
     return month_map.get(month_name.lower(), None)
 
 
-# --- Inicialización de la DB (se mantiene igual) ---
 def initialize_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    # ... (código de creación de tabla e inserción de datos) ...
 
-    # 1. Crear tabla
+    # 1. Crete table
     cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
             id INTEGER PRIMARY KEY,
@@ -72,13 +67,13 @@ def initialize_db():
     """)
     conn.commit()
 
-    # 2. Insertar datos si la tabla está vacía
+    # 2. Insert data if empty
     cursor.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}")
     if cursor.fetchone()[0] == 0:
         # print("Tabla del calendario vacía. Insertando 24 GPs.") # Usar print o logger fuera de Streamlit
         for item in CALENDAR_DATA:
             cursor.execute(f"""
-                INSERT INTO {TABLE_NAME} (gp, circuito, desde, hasta) 
+                INSERT INTO {TABLE_NAME} (gp, circuito, desde, hasta)
                 VALUES (?, ?, ?, ?)
             """, (item['GP'], item['circuito'], item['desde'], item['hasta']))
         conn.commit()
@@ -91,10 +86,10 @@ def initialize_db():
 # --- Consulta por nombre de GP (se mantiene igual) ---
 def get_calendar_by_text(search_text: str, column_name: str):
     """
-    Consulta el calendario por un texto parcial en el nombre del GP o el circuito.
+    Check the calendar for partial text in the GP or circuit name.
 
-    :param search_text: El texto parcial a buscar (ej: 'Barcelona' o 'España').
-    :param column_name: 'gp' o 'circuito'.
+    :param search_text: The partial text to search for (e.g., 'Barcelona' or 'Spain').
+    :param column_name: 'gp' or 'circuito'.
     """
     if column_name not in ['gp', 'circuito']:
         return []
@@ -113,7 +108,7 @@ def get_calendar_by_text(search_text: str, column_name: str):
 
 def get_calendar_by_month(month_name: str):
     """
-    Busca GPs cuyo campo 'desde' o 'hasta' caiga dentro del mes especificado.
+    Search for GPs whose 'from' or 'to' field falls within the specified month.
     """
     month_num = _get_month_number(month_name)
     if not month_num:
@@ -122,9 +117,6 @@ def get_calendar_by_month(month_name: str):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
-    # SQLite usa un formato de fecha específico para hacer la comparación.
-    # Como nuestros datos están en 'DD/MM/YYYY', necesitamos usar LIKE para encontrar el mes.
-    # Buscamos ' desde LIKE '%/MM/%' OR hasta LIKE '%/MM/%' '
     month_pattern = f'%/{month_num}/%'
     query = f"""
         SELECT gp, circuito, desde, hasta 
@@ -138,5 +130,4 @@ def get_calendar_by_month(month_name: str):
     return results
 
 
-# Llama a initialize_db() al importar el módulo
 initialize_db()

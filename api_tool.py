@@ -10,7 +10,7 @@ from db_calendar import get_calendar_by_text, get_calendar_by_month
 
 app = FastAPI(
     title="F1 Calendar API Tool",
-    description="API para consultar el calendario de la Fórmula 1 2026 por GP o por mes. Diseñada para LLMs.",
+    description="API to query the 2026 Formula 1 calendar by GP or month. Designed for LLMs",
     version="1.0.0"
 )
 
@@ -23,59 +23,55 @@ class CalendarEntry(BaseModel):
     hasta: str = Field(..., example="13/09/2026")
 
 
-# --- Definición de la función Tool para el LLM ---
+# --- API definition for LLM Tool function ---
 @app.get(
     "/calendar/query",
     response_model=list[CalendarEntry],
-    summary="Obtiene el calendario de F1 2026, filtrando por GP, Circuito o Mes."
+    summary="Get the 2026 F1 calendar, filtering by GP, Circuit or Month."
 )
 def query_f1_calendar(
     # --- CORRECCIÓN AQUÍ: Usar Query(default=None, description=...) ---
     gp_name: str | None = Query(
         None,
-        description="El nombre parcial del Gran Premio a buscar (ej: 'Barcelona')."
+        description="The partial name of the Grand Prix to search for ('Barcelona')."
     ),
     circuit_name: str | None = Query(
         None, 
-        description="El nombre parcial del circuito a buscar (ej: 'Monza')."
+        description="The partial name of the circuit to search for ('Monza')."
     ),
     month_name: str | None = Query(
         None,
-        description="El nombre completo del mes (ej: 'junio')."
+        description="The full name of the month ('June')."
     )
 ):
     """
-    Busca GPs por nombre de Gran Premio, circuito o mes.
-    La prioridad es: GP > Circuito > Mes.
-    Si todos los parametros son nulos, devuelve todo el calendario.
+    Search for Grand Prix races by Grand Prix name, circuit, or month.
+    Priority: GP > Circuit > Month.
+    If all parameters are null, return the entire calendar.
 
-    :return: Una lista de objetos JSON con la información del calendario.
+    :return: A list of JSON objects containing the calendar information.
     """
 
-    if gp_name:
-        # Prioridad 1: Búsqueda por nombre de GP
+    if gp_name:        
         results = get_calendar_by_text(gp_name, 'gp')
-    elif circuit_name:
-        # Prioridad 2: Búsqueda por nombre de Circuito
+    elif circuit_name:        
         results = get_calendar_by_text(circuit_name, 'circuito')
-    elif month_name:
-        # Prioridad 3: Búsqueda por mes
+    elif month_name:        
         results = get_calendar_by_month(month_name)
     else:
-        # Sin filtros, devolver todo (usando un query vacío de GP para retornar todo)
+        # Without filters, return everything (using an empty GP query to return everything)
         results = get_calendar_by_text(search_text='', column_name='gp')
 
     if not results:
         # Retorna una estructura vacía si no se encuentra nada
         raise HTTPException(
             status_code=404,
-            detail="No se encontró ningún Gran Premio que coincida con el nombre, circuito o mes especificado."
+            detail="No Grand Prix was found that matches the specified name, circuit, or month."
         )
 
     return results
 
 
-# --- Ejecución ---
 if __name__ == "__main__":
-    print(f"API iniciada. Accede a la documentación en: http://127.0.0.1:8000/docs")
+    print(f"API launched. Access the documentation at: http://127.0.0.1:8000/docs")
     uvicorn.run(app, host="0.0.0.0", port=8000)

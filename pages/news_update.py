@@ -5,12 +5,13 @@ import time
 from rag import get_vector_store, update_db_with_news
 from llm_client import EMBEDDING_MODEL_LOCAL
 
-vector_store = get_vector_store()
 
 st.set_page_config(
     page_title="📡 News Update"
 )
 st.title("📡 News update (local FAISS DB)")
+with st.spinner("Loading vector database (FAISS)..."):
+    vector_store = get_vector_store()
 st.caption(f"Indexed DB: **{st.session_state['db_size']}** documents (Embeddings: {EMBEDDING_MODEL_LOCAL}).")
 st.markdown("---")
 

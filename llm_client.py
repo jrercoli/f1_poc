@@ -15,56 +15,40 @@ CALENDAR_API_URL = os.getenv("CALENDAR_API_URL", "http://127.0.0.1:8000")
 
 def get_gemini_client():
     """
-    Inicializa y retorna el cliente directo de Gemini (google.genai).
-    La clave GEMINI_API_KEY se toma automáticamente del entorno.
+    Initializes and returns the direct Gemini client (google.genai).
+    The GEMINI_API_KEY is automatically retrieved from the environment.
     """
     try:
         if not os.getenv("GEMINI_API_KEY"):
-            raise ValueError("GEMINI_API_KEY no está configurada.")
+            raise ValueError("GEMINI_API_KEY it is not configured.")
         return genai.Client()
     except Exception as e:
         # Re-lanzamos la excepción para que Streamlit la muestre
-        raise Exception(f"Error al inicializar cliente Gemini: {e}")
+        raise Exception(f"Error initializing Gemini client: {e}")
 
 
 def get_local_embedding_function():
     """
-    Inicializa y retorna la función de embeddings de Sentence Transformers (local).
+    Initializes and returns the Sentence Transformers embeddings function (local).
     """
     return SentenceTransformerEmbeddings(model_name=EMBEDDING_MODEL_LOCAL)
 
 
-from rag import get_vector_store, get_rag_context
-
-
 def _prepare_tools() -> list[genai.types.Tool]:
     """
-    Descarga el esquema OpenAPI de la API Tool y lo usa para configurar la Tool.
+    Download the OpenAPI schema from the API Tool and use it to configure the Tool.
     """
     tools = []
     api_uri = f"{CALENDAR_API_URL}/openapi.json"
 
     try:
-        st.info(f"⬇️ Intentando descargar esquema OpenAPI desde: {api_uri}")
+        st.info(f"Attempting to download OpenAPI schema from⬇️ : {api_uri}")
 
-        # DESCARGAR el esquema OpenAPI (JSON)
         response = requests.get(api_uri)
-        response.raise_for_status()  # Lanza una excepción para códigos 4xx/5xx
+        response.raise_for_status()
         openapi_spec = response.json()
 
-        # EXTRAER la declaración de función requerida por Gemini
-        # FastAPI genera la especificación OpenAPI. Debemos adaptarla a Tool.
-        # Buscamos la especificación de la única función /calendar/query
-
-        # El nombre de la función en la especificación de FastAPI debe ser único.
-        # Lo más fácil es extraer las declaraciones de función del componente 'paths'.        
-        # Usamos una forma manual de construir la Tool a partir de la especificación
-        # ya que genai.types.Tool.from_dict/from_json puede variar entre versiones.
-
-        # Aquí asumiremos que conocemos la estructura de la función 'query_f1_calendar'
-        # que es la única en tu API Tool:
-
-        # 1. Definir el diccionario del esquema de parámetros
+        # 1. Define the parameter scheme dictionary
         parameters_dict = {
             'type': 'object',
             'properties': {
@@ -75,7 +59,7 @@ def _prepare_tools() -> list[genai.types.Tool]:
                 for p in openapi_spec['paths']['/calendar/query']['get']['parameters']
             }
         }
-        # 2. Construir la FunctionDeclaration
+        # 2. Build FunctionDeclaration to genai
         function_declaration = genai.types.FunctionDeclaration(
             name='query_f1_calendar',
             description=openapi_spec['paths']['/calendar/query']['get']['summary'],
@@ -85,12 +69,12 @@ def _prepare_tools() -> list[genai.types.Tool]:
         calendar_tool = genai.types.Tool(function_declarations=[function_declaration])
         tools.append(calendar_tool)
 
-        st.success(f"✅ Tool configurada: **{function_declaration.name}** (Calendario)")
+        st.success(f"✅ Configured Tool: **{function_declaration.name}** (Calendar)")
 
     except requests.exceptions.RequestException as e:
-        st.error(f"❌ Error de red/HTTP al cargar la Tool desde {api_uri}. La API debe estar corriendo. Error: **{e}**")
+        st.error(f"❌ Network/HTTP error loading the Tool from {api_uri}. The API must be running. Error:**{e}**")
     except Exception as e:
-        st.error(f"❌ Error al parsear el esquema OpenAPI. Detalles: **{e}**")
+        st.error(f"❌ Error parsing OpenAPI schema. Details: **{e}**")
 
     return tools
 
@@ -99,11 +83,11 @@ def _handle_function_call(client: genai.Client,
                           response_1: genai.types.GenerateContentResponse,                          
                           context_prompt: str) -> str:
     """
-    Ejecuta la llamada a la función (API Tool) y pasa el resultado al LLM.    
+    Execute the function call (API Tool) and pass the result to the LLM.   
     """
     function_call = response_1.function_calls[0]
     function_name = function_call.name
-    st.warning(f"🤖 El LLM ha decidido **ignorar el RAG y llamar a la Tool**: {function_name}")
+    st.warning(f"🤖 The LLM has decided to ignore the RAG and call the Tool**: {function_name}")
 
     # 1. Construir URL de la API
     url_endpoint = "/calendar/query"
@@ -111,7 +95,7 @@ def _handle_function_call(client: genai.Client,
     query_string = "&".join(f"{key}={value}" for key, value in params.items())
     full_url = f"{CALENDAR_API_URL}{url_endpoint}?{query_string}"
 
-    st.code(f"🔨 URL de la API generada:\n{full_url}", language="http")
+    st.code(f"🔨 Generated API URL:\n{full_url}", language="http")
 
     # 2. Ejecutar la llamada HTTP
     tool_output = None
@@ -122,25 +106,23 @@ def _handle_function_call(client: genai.Client,
         # if tool output result is a list convert to dict
         if isinstance(tool_output, list):
             tool_output = {"calendar_entries": tool_output}
-        st.success("✅ Tool ejecutada exitosamente. Datos obtenidos.")
+        st.success("✅ Tool executed successfully. Data obtained.")
 
     except requests.exceptions.RequestException as e:
-        st.error(f"❌ Error al llamar a la API Tool: {e}")
-        # Aseguramos que tool_output sea un json dict para la segunda llamada
-        tool_output = {"error": f"Fallo en la conexión/API: {e}"}
+        st.error(f"❌ Error calling the API Tool: {e}")        
+        tool_output = {"error": f"Connection/API failure: {e}"}
 
-    # 3. Segunda Llamada a Gemini (Generación Final de la Respuesta)
-
+    # 3. Second Call to Gemini (Final Generation of the Answer)
     # 3.1 Build content history for the second call
     contents_for_second_call = [
-        # prompt original del usuario (context_prompt)
+        # original user prompt (context_prompt)
         genai.types.Content(
             role="user",
             parts=[genai.types.Part(text=context_prompt)]
         ),
-        # reutilizamos el objeto Content original del modelo que contiene la FunctionCall
+        # We reuse the original Content object from the model that contains the FunctionCall
         response_1.candidates[0].content,
-        # el resultado de la Tool (FunctionResponse)
+        # Tool result (FunctionResponse)
         genai.types.Content(
             role="tool",
             parts=[genai.types.Part.from_function_response(
@@ -157,28 +139,29 @@ def _handle_function_call(client: genai.Client,
     return second_response.text
 
 
-def unified_query_gemini(prompt: str) -> str:
+def unified_query_gemini(prompt: str, vector_store) -> str:
     """
-    Consulta central: configura RAG y Tools. El LLM decide qué recurso usar.
+    Central query: configures RAG and Tools. The LLM decides which resource to use.
     """
+    from rag import get_rag_context
+
     client = get_gemini_client()
 
-    # 1. Preparar el contexto RAG
-    vector_store = get_vector_store()
+    # 1. Prepare the RAG context
     rag_context_text, _ = get_rag_context(prompt, vector_store)
 
-    # 1.1. Inyectar el contexto RAG en el prompt
+    # 1.1. Inject the RAG context into the prompt
     context_prompt = (
-        f"CONTEXTO DE NOTICIAS RECIENTES (RAG):\n---\n{rag_context_text}\n---\n"
-        f"Basándote en el contexto anterior o en la Tool API disponible, responde a la siguiente pregunta: {prompt}"
+        f"CONTEXT OF RECENT NEWS (RAG):\n---\n{rag_context_text}\n---\n"
+        f"Based on the context above or the available Tool API, answer the following question: {prompt}"
     )
     st.markdown("---")
-    st.info(f"🔎 Contexto RAG inyectado para la búsqueda de noticias.")
+    st.info(f"🔎 RAG context injected for news search.")
 
-    # 2. Preparar la API Tool
+    # 2. Prepare API Tool
     tools = _prepare_tools()
 
-    # 3. Primera Llamada a Gemini (Decisión)
+    # 3. First call to LLM (Decision)
     response_1 = client.models.generate_content(
         model=LLM_MODEL,
         contents=[context_prompt],
@@ -187,11 +170,9 @@ def unified_query_gemini(prompt: str) -> str:
         )
     )
 
-    # 4. Manejo del Resultado
-    if response_1.function_calls:
-        # El LLM elige la Tool (Delegamos a la función auxiliar)
+    # 4. Result manage
+    if response_1.function_calls:        
         return _handle_function_call(client, response_1, context_prompt)
-    else:
-        # El LLM usó el contexto RAG o su conocimiento interno
-        st.success("🧠 El LLM respondió usando el **Contexto RAG** o su conocimiento interno.")
+    else:        
+        st.success("🧠 The LLM responded using the **RAG Context** or their internal knowledge.")
         return response_1.text

@@ -6,8 +6,8 @@ UTC = pytz.timezone('UTC')
 ISO_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 
 # -------------------------------------------------------------------
-# MAPA DE CONFIGURACIÓN DE FUENTES (F1_SOURCE_CONFIG)
-# lógica de extracción de fecha para cada sitio web.
+# SOURCE CONFIGURATION MAP (F1_SOURCE_CONFIG)
+# Date extraction logic for each website.
 # -------------------------------------------------------------------
 F1_SOURCE_CONFIG = {    
     "https://gpblog.com/en/": {
@@ -35,22 +35,18 @@ F1_SOURCE_CONFIG = {
     },
 '''
 # -------------------------------------------------------------------
-# LISTA DE FUENTES (F1_SOURCES)
-# Se genera a partir del mapa de configuración para la iteración del scraper.
-# -------------------------------------------------------------------
 F1_SOURCES = [{"url": url, **config} for url, config in F1_SOURCE_CONFIG.items()]
 
 # -------------------------------------------------------------------
-# PALABRAS CLAVE (F1_KEYWORDS)
-# Usadas para determinar la relevancia de los artículos.
+# KEYWORDS (F1_KEYWORDS)
+# Used to determine the relevance of the articles.
 # -------------------------------------------------------------------
 F1_KEYWORDS = ['f1', 'fórmula 1', 'formula 1', 'verstappen', 'hamilton', 'alonso', 'sainz', 'wolff',
                'leclerc', 'red bull', 'mercedes', 'ferrari', 'gp', 'gran premio', 'aston martin'
                'mclaren', 'alpine', 'pit stop', 'parrilla', 'carrera', 'colapinto']
 
 # -------------------------------------------------------------------
-# VARIABLES GLOBALES
-# Se exportan para uso en otros módulos si es necesario.
+# User agents for web scarper
 # -------------------------------------------------------------------
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
