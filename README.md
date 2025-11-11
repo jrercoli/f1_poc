@@ -21,6 +21,17 @@ The main goal is for the **LLM to autonomously decide which resource to use** to
 | **Database** | SQLite | Local storage for structured calendar data. |
 | **User Interface** | Streamlit | Interactive web interface for the PoC application. |
 
+## Gemini API Configuration (CRITICAL)
+
+For this application to perform RAG and scraping operations and use tools, it is **REQUIRED** that you configure your Gemini API key.
+
+**Key Steps:**
+
+1. **Get Your Key:** Generate an API key from Google AI Studio.
+2. **Google Cloud Project:** Ensure your key is associated with a Google Cloud project with **active billing**.
+3. **API Activation:** Within your Google Cloud project, verify that the following APIs are enabled:
+* **Generative Language API** (For ex: `gemini-2.5-flash`).
+4. **Environment Variable Configuration:** You must set your API key as an environment variable named `GEMINI_API_KEY` in the environment where the application runs.
 ***
 
 ## 🚀 Application Options (Streamlit Pages)
