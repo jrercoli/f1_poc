@@ -27,14 +27,15 @@ def extract_date_from_html(article_html: str, config: dict, messages: list) -> d
     date_tag = None
     date_str = None
 
-    date_tag = soup.select_one(config["date_selector"])
-    if date_tag is None and config["date_selector"].startswith('time.'):
-        class_name = config["date_selector"].split('.')[-1]
-        date_tag = soup.find('time', class_=class_name)
+    if config["date_selector"]:
+        date_tag = soup.select_one(config["date_selector"])
+        if date_tag is None and config["date_selector"].startswith('time.'):
+            class_name = config["date_selector"].split('.')[-1]
+            date_tag = soup.find('time', class_=class_name)
 
-    if date_tag:
-        date_str = date_tag.get(config["date_attribute"])
-        date_format = config["date_format"]
+        if date_tag:
+            date_str = date_tag.get(config["date_attribute"])
+            date_format = config["date_format"]
 
     # If the tag or attribute was not found, we activate failure debugging.
     if date_tag is None or date_str is None:
@@ -112,7 +113,7 @@ def scrape_and_process_article(url: str, source_data: dict, min_date: datetime, 
     """
     Scrapes a URL, extracts the text, summarizes it, and returns the data in RAG format.
     Returns a single-item list (or empty if it fails/is old).
-    """    
+    """
     try:
         user_agent = random.choice(USER_AGENTS)
         article = Article(url, headers={'User-Agent': user_agent})
@@ -122,7 +123,7 @@ def scrape_and_process_article(url: str, source_data: dict, min_date: datetime, 
         if source_data.get('is_blocked'):
             # If it's locked, we rely on newspaper's internal parser
             pub_date = None
-        else:            
+        else:
             pub_date = extract_date_from_html(article.html, source_data, messages)
 
         article.parse()

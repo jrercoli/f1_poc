@@ -10,30 +10,15 @@ ISO_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 # Date extraction logic for each website.
 # -------------------------------------------------------------------
 F1_SOURCE_CONFIG = {    
-    "https://gpblog.com/en/": {
+    "https://www.f1technical.net/news/": {
         "source": "GP Blog",
         "driver": "F1 News",
-        "date_selector": 'div.text-sm.font-semibold.leading-none.tracking-wide.uppercase.text-neutral-400',
-        "date_attribute": "text",                     # Atributo que contiene la fecha 'datetime'
-        "date_format": '%H:%M, %d %b',                # Ejemplo: 10:05, 10 Nov
+        "date_selector": '',
+        "date_attribute": "",
+        "date_format": '%H:%M, %d %b',
     }
 }
-'''
-    "https://es.motorsport.com/f1/news/": {
-        "source": "MotorSport F1",
-        "driver": "F1 News",
-        "date_selector": 'time.ms-date-with-timezone',  # Selector CSS para el tag time
-        "date_attribute": "datetime",                   # Atributo que contiene la fecha 'datetime'
-        "date_format": ISO_FORMAT,                      # Formato de fecha ISO: '2025-11-06T19:56:12Z'        
-    },
-    "https://www.caranddriver.com/es/formula-1/": {
-        "source": "Car and Driver F1",
-        "driver": "F1 News",
-        "date_selector": 'meta[name="sailthru.date"]',  # Selector CSS para el tag meta
-        "date_attribute": "content",                    # Atributo del tag que contiene la fecha
-        "date_format": '%Y-%m-%d %H:%M:%S',             # Formato de fecha esperado: '2025-11-06 20:00:00'
-    },
-'''
+
 # -------------------------------------------------------------------
 F1_SOURCES = [{"url": url, **config} for url, config in F1_SOURCE_CONFIG.items()]
 
