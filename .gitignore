@@ -16,6 +16,7 @@ build/
 
 .vscode/
 .idea/
+.devcontainer/
 
 .coverage
 htmlcov/
